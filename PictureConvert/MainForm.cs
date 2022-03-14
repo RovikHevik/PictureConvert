@@ -9,7 +9,7 @@ namespace PictureConvert
     public partial class Main_Form : Form
     {
         private int A4Width = 70*4;
-        private int AHeight = 99*4;
+        private int A4Height = 99*4;
 
         public Main_Form()
         {
@@ -24,9 +24,9 @@ namespace PictureConvert
                 try
                 {
                     Image preImage = Image.FromFile(Path, true);          
-                    ReadyPicture.Image = ImageLogic.MagicImage(ImageLogic.ResizeImage(preImage, A4Width, AHeight));
+                    ReadyPicture.Image = ImageLogic.MagicImage(ImageLogic.ResizeImage(preImage, A4Width, A4Height));
                     ResizedImg.Image = ImageLogic.ResizeImage(preImage, ResizedImg.Width, ResizedImg.Height);
-                    chromaticImage.Image = ImageLogic.ChromaticImage(ImageLogic.ResizeImage(preImage, A4Width, AHeight));
+                    chromaticImage.Image = ImageLogic.ImageWithCode(ImageLogic.MagicImage(ImageLogic.ResizeImage(preImage, A4Width/4, A4Height/4)));
                     StartMagic.Visible = false; 
                     ReadyMagic.Visible = true;
                 }
@@ -47,7 +47,7 @@ namespace PictureConvert
             if (saveReadyFile.ShowDialog() == DialogResult.OK)
             {
                 string Path = saveReadyFile.FileName;
-                ReadyPicture.Image.Save(Path, ImageFormat.Png);
+                chromaticImage.Image.Save(Path, ImageFormat.Png);
                 MessageBox.Show("готово");
             }
             else

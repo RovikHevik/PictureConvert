@@ -13,7 +13,7 @@ namespace PictureConvert.Logic
         /// </summary>
         private static Color[] colorList = new Color[]
         {
-            Color.FromArgb(0, 0, 0),
+            Color.FromArgb(0, 0, 0), 
             Color.FromArgb(0, 0, 255),
             Color.FromArgb(0, 234, 255),
             Color.FromArgb(0, 255, 0),
@@ -21,17 +21,80 @@ namespace PictureConvert.Logic
             Color.FromArgb(235, 115, 115),
             Color.FromArgb(255, 0, 157),
             Color.FromArgb(255, 132, 0),
+            Color.FromArgb(255, 223, 196),
             Color.FromArgb(255, 238, 0),
             Color.FromArgb(255, 255, 255),
+            Color.FromArgb(165, 120, 92),
             Color.FromArgb(255, 97, 97),
             Color.FromArgb(27, 54, 56),
             Color.FromArgb(29, 56, 27),
             Color.FromArgb(43, 255, 0),
             Color.FromArgb(53, 56, 27),
+            Color.FromArgb(201, 112, 100),
             Color.FromArgb(56, 28, 27),
+            Color.FromArgb(194, 159, 127),
+            Color.FromArgb(204, 145, 131),
+            Color.FromArgb(133, 87, 72),
+            Color.FromArgb(107, 70, 60),
             Color.FromArgb(72, 15, 77),
+            Color.FromArgb(45, 46, 50),
             Color.FromArgb(255, 0, 0),
         };
+
+        public static Bitmap ImageWithCode(Bitmap image)
+        {
+            Bitmap clone = image;
+            Bitmap result = ResizeImage(clone, 2480, 3508);
+            Graphics g = Graphics.FromImage(result);
+            int xNum = 70;
+            int yNum = 99;
+            int xSize = result.Width / xNum;
+            int ySize = result.Height / yNum;
+            
+            for(int x = xSize; x < result.Width; x = x + xSize)
+            {
+                for (int y = 0; y < result.Height; y++)
+                {
+                    result.SetPixel(x, y, Color.Black);
+                }
+            }
+            for (int y = ySize; y < result.Height; y = y + xSize)
+            {
+                for (int x = 0; x < result.Width; x++)
+                {
+                    result.SetPixel(x, y, Color.Black);
+                }
+            }
+            int secondX = 1;
+            for (int x = 0; x < image.Width; x++)
+            {
+                int secondY = 1;
+                for (int y = 0; y < image.Height; y++)
+                {                 
+                    int ColorNum = 0;
+                    Brush tempBrush = new SolidBrush(Color.White);
+                    Color tempColor = Color.FromArgb(255, 255, 255);
+                    double tempNum = int.MaxValue;
+                    for (int a = 0; a < colorList.Length; a++)
+                    {
+                        if (getChromaticDistance(image.GetPixel(x, y), colorList[a]) < tempNum)
+                        {
+                            tempColor = colorList[a];
+                            tempNum = getChromaticDistance(image.GetPixel(x, y), colorList[a]);
+                            ColorNum = a;
+                        }
+                        if(getChromaticDistance(image.GetPixel(x, y), Color.FromArgb(0,0,0)) > getChromaticDistance(image.GetPixel(x, y), Color.FromArgb(255, 255, 255)))
+                        {
+                            tempBrush = Brushes.Black;
+                        }
+                    }
+                    g.DrawString(ColorNum.ToString(), new Font("Calibri", 20), tempBrush, secondX, secondY);
+                    secondY += 35;
+                }
+                secondX += 35;
+            }
+            return result;
+        }
 
         /// <summary>
         /// Resize the image to the specified width and height.
