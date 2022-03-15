@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace PictureConvert.Logic
@@ -43,47 +45,46 @@ namespace PictureConvert.Logic
 
         public static Bitmap ImageWithCode(Bitmap image)
         {
-            Bitmap clone = image;
-            Bitmap result = ResizeImage(clone, 2480, 3508);
+            Bitmap result = ResizeImage((Bitmap)image.Clone(), 2480, 3508);
             Graphics g = Graphics.FromImage(result);
             int xNum = 70;
             int yNum = 99;
             int xSize = result.Width / xNum;
             int ySize = result.Height / yNum;
-            
-            for(int x = xSize; x < result.Width; x = x + xSize)
+            Pen blackPen = new Pen(Color.Black, 1);
+
+            for (int x = xSize; x < result.Width; x = x + xSize)
             {
-                for (int y = 0; y < result.Height; y++)
-                {
-                    result.SetPixel(x, y, Color.Black);
-                }
+                PointF pointOne = new PointF(x, result.Height);
+                PointF pointTwo = new PointF(x, 0);
+                g.DrawLine(blackPen, pointOne, pointTwo);
             }
             for (int y = ySize; y < result.Height; y = y + xSize)
             {
-                for (int x = 0; x < result.Width; x++)
-                {
-                    result.SetPixel(x, y, Color.Black);
-                }
+                PointF pointOne = new PointF(result.Width, y);
+                PointF pointTwo = new PointF(0, y);
+                g.DrawLine(blackPen, pointOne, pointTwo);
             }
             int secondX = 1;
             for (int x = 0; x < image.Width; x++)
             {
                 int secondY = 1;
                 for (int y = 0; y < image.Height; y++)
-                {                 
+                {
                     int ColorNum = 0;
                     Brush tempBrush = new SolidBrush(Color.White);
                     Color tempColor = Color.FromArgb(255, 255, 255);
                     double tempNum = int.MaxValue;
                     for (int a = 0; a < colorList.Length; a++)
                     {
-                        if (getChromaticDistance(image.GetPixel(x, y), colorList[a]) < tempNum)
+                        var chromaticDistance = getChromaticDistance(image.GetPixel(x, y), colorList[a]);
+                        if (chromaticDistance < tempNum)
                         {
                             tempColor = colorList[a];
-                            tempNum = getChromaticDistance(image.GetPixel(x, y), colorList[a]);
+                            tempNum = chromaticDistance;
                             ColorNum = a;
                         }
-                        if(getChromaticDistance(image.GetPixel(x, y), Color.FromArgb(0,0,0)) > getChromaticDistance(image.GetPixel(x, y), Color.FromArgb(255, 255, 255)))
+                        if (getChromaticDistance(image.GetPixel(x, y), Color.FromArgb(0, 0, 0)) > getChromaticDistance(image.GetPixel(x, y), Color.FromArgb(255, 255, 255)))
                         {
                             tempBrush = Brushes.Black;
                         }
@@ -103,7 +104,14 @@ namespace PictureConvert.Logic
         /// <returns>The resized image.</returns>
         public static Bitmap ResizeImage(Image image, int width, int height)
         {
-            var destRect = new Rectangle(0, 0, width, height);
+            double oldWidth = image.Width;
+            double oldHeight = image.Height;
+
+            var widthRatio = width / oldWidth;
+            var heightRatio = height / oldHeight;
+
+            var factor = Math.Min(widthRatio, heightRatio);
+            var destRect = new Rectangle(0, 0, (int)(factor * oldWidth), (int)(factor * oldHeight));
             var destImage = new Bitmap(width, height);
 
             destImage.SetResolution(image.HorizontalResolution, image.VerticalResolution);
@@ -118,6 +126,7 @@ namespace PictureConvert.Logic
 
                 using (var wrapMode = new ImageAttributes())
                 {
+                    /// TODO make good not strach
                     wrapMode.SetWrapMode(WrapMode.TileFlipXY);
                     graphics.DrawImage(image, destRect, 0, 0, image.Width, image.Height, GraphicsUnit.Pixel, wrapMode);
                 }
@@ -133,7 +142,7 @@ namespace PictureConvert.Logic
         /// <returns>Ready image.</returns>
         public static Bitmap MagicImage(Bitmap image)
         {
-
+            colorList = AnalizColor((Bitmap)image.Clone());
             for(int x = 1; x < image.Width; x++)
             {
                 for (int y = 1; y < image.Height; y++)
@@ -191,6 +200,99 @@ namespace PictureConvert.Logic
             return imageInput;
         }
 
+        /// <summary>
+        ///Get Top 20 color on image.
+        /// </summary>
+        /// <param name="image">Image to geg color.</param>
+        /// <returns>Color array.</returns>
+        public static Color[] AnalizColor(Bitmap image)
+        {
+            List<Color> colorsList = new List<Color>();
+
+            using (var bitmap = image)
+            {
+                decimal startX = 0;
+                decimal startY = 0;
+                decimal finishX = image.Width / 3;
+                decimal finishY = image.Height / 3;
+                for(int iter = 0; iter < 3; iter++)
+                {
+                    for(int iterY = 0; iterY < 3; iterY++)
+                    {
+                        var frame = new Rectangle((int)Math.Floor(startX), (int)Math.Floor(startY), (int)Math.Floor(finishX), (int)Math.Floor(finishY));
+
+                        var colorsWithCount = GetPixels(cropImage(bitmap, frame))
+                                                              .GroupBy(color => color)
+                                                              .Select(grp =>
+                                                                  new
+                                                                  {
+                                                                      Color = grp.Key,
+                                                                      Count = grp.Count()
+                                                                  })
+                                                              .OrderByDescending(x => x.Count)
+                                                              .Take(15);
+
+                        for (var i = 0; i < colorsWithCount.Count(); i++)
+                        {
+                            if (i == 0)
+                            {
+                                colorsList.Add(Color.FromArgb(colorsWithCount.ElementAt(i).Color.R, colorsWithCount.ElementAt(i).Color.G, colorsWithCount.ElementAt(i).Color.B));
+                            }
+                            else
+                            {
+                                if (getChromaticDistance(colorsWithCount.ElementAt(i).Color, colorsWithCount.ElementAt(i - 1).Color) < 60 && !colorsList.Contains(Color.FromArgb(colorsWithCount.ElementAt(i).Color.R, colorsWithCount.ElementAt(i).Color.G, colorsWithCount.ElementAt(i).Color.B)))
+                                {
+                                    colorsList.Add(Color.FromArgb(colorsWithCount.ElementAt(i).Color.R, colorsWithCount.ElementAt(i).Color.G, colorsWithCount.ElementAt(i).Color.B));
+                                }
+                            }
+                        }
+                        startY = finishY;
+                        finishY = finishY + image.Height / 3;
+
+                    }
+
+                    startX = finishX;
+                    finishX = finishX + image.Width / 3;
+
+                }                        
+            }
+
+            return colorsList.ToArray();
+        }
+
+        /// <summary>
+        /// Get pixel list.
+        /// </summary>
+        /// <param name="bitmap">Image to treatment.</param>
+        /// <returns>IEnumerable of color.</returns>
+        private static IEnumerable<Color> GetPixels(Bitmap bitmap)
+        {
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                for (int y = 0; y < bitmap.Height; y++)
+                {
+                    string[] colors = Enum.GetNames(typeof(System.Drawing.KnownColor));
+                    Color pixel = bitmap.GetPixel(x, y);
+                    yield return pixel;
+                }
+            }
+        }
+        private static IEnumerable<Color> GetSystemColors()
+        {
+            Type type = typeof(Color);
+            return type.GetProperties().Where(info => info.PropertyType == type).Select(info => (Color)info.GetValue(null, null));
+        }
+
+
+        private static Bitmap cropImage(Bitmap img, Rectangle cropArea)
+        {
+            Bitmap bmp = new Bitmap(cropArea.Width, cropArea.Height);
+            using (Graphics gph = Graphics.FromImage(bmp))
+            {
+                gph.DrawImage(img, new Rectangle(0, 0, bmp.Width, bmp.Height), cropArea, GraphicsUnit.Pixel);
+            }
+            return bmp;
+        }
         /// <summary>
         /// Get cromatic distance of color.
         /// </summary>
