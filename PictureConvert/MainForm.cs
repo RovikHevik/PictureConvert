@@ -9,25 +9,42 @@ namespace PictureConvert
 {
     public partial class Main_Form : Form
     {
+
         private static Bitmap ImageWithCode;
         private static Bitmap MagicImage;
         private static Bitmap ResizedImage;
+        private static Bitmap PaleteColor;
         private static Image preImage;
-        private static Thread processingThread = new Thread(new ThreadStart(MakesMagic));
-        private static int A4Height = 99 * 4;
-        private static int A4Width = 70 * 4;
+        private static readonly Thread resizedThread = new Thread(new ThreadStart(ResizeImage));
+        private static readonly Thread magicThread = new Thread(new ThreadStart(MakesMagic));
+        private static readonly Thread codeOnImageThread = new Thread(new ThreadStart(CodeImage));
+        private static readonly int A4Height = 99;
+        private static readonly int A4Width = 70;
         private static int ResImgHeight;
         private static int ResImgWidth;
         private static string Path;
 
-
-        private static void MakesMagic()
+        private static void ResizeImage()
         {
             preImage = Image.FromFile(Path, true);
             ResizedImage = ImageLogic.ResizeImage(preImage, ResImgWidth, ResImgHeight);
-            MagicImage = ImageLogic.ResizeImage(ImageLogic.MagicImage(ImageLogic.ResizeImage(preImage, A4Width / 4, A4Height / 4)), A4Width, A4Height);
-            ImageWithCode = ImageLogic.ImageWithCode((Bitmap)MagicImage.Clone());
-            processingThread.Abort();
+            magicThread.Start();
+            codeOnImageThread.Start();
+            resizedThread.Abort();
+        }
+
+        private static void CodeImage()
+        {
+            magicThread.Join();
+            ImageWithCode = ImageLogic.ImageWithCode(ImageLogic.ResizeImage((Bitmap)MagicImage.Clone(), A4Width, A4Height));
+            PaleteColor = ImageLogic.MakeColorPalete();
+            codeOnImageThread.Abort();
+        }
+
+        private static void MakesMagic()
+        {
+            MagicImage = ImageLogic.MagicImage((Bitmap)ResizedImage.Clone());
+            magicThread.Abort();
         }
 
         public Main_Form()
@@ -73,7 +90,7 @@ namespace PictureConvert
                     {
                         Preloader.Visible = true;
                         StartMagic.Visible = false;
-                        processingThread.Start();
+                        resizedThread.Start();
                         kostil.Start();
                     }
                     catch (Exception ex)
@@ -91,7 +108,7 @@ namespace PictureConvert
                 try
                 {
                     Preloader.Visible = true;
-                    processingThread.Start();
+                    resizedThread.Start();
                 }
                 catch (Exception ex)
                 {
@@ -112,8 +129,8 @@ namespace PictureConvert
         {
             if (saveReadyFile.ShowDialog() == DialogResult.OK)
             {
-                string Path = saveReadyFile.FileName;
                 ImageWithCode.Save(saveReadyFile.FileName, ImageFormat.Png);
+                PaleteColor.Save(saveReadyFile.FileName.Replace(".png", "Colors.png"), ImageFormat.Png);
                 MessageBox.Show("готово");
             }
             else
@@ -122,20 +139,13 @@ namespace PictureConvert
             }
         }
 
-        private void kostil_Tick(object sender, EventArgs e)
+        private void Kostil_Tick(object sender, EventArgs e)
         {
-            if(processingThread.ThreadState == ThreadState.Stopped)
+            if(codeOnImageThread.ThreadState == ThreadState.Stopped)
             {
                 StopPreloader();
                 kostil.Stop();
             }
         }
-
     }
-
-    class ThreadWorker
-    {
-
-    }
-
 }

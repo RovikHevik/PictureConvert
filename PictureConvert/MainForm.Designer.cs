@@ -127,7 +127,7 @@
             // 
             this.kostil.Enabled = true;
             this.kostil.Interval = 500;
-            this.kostil.Tick += new System.EventHandler(this.kostil_Tick);
+            this.kostil.Tick += new System.EventHandler(this.Kostil_Tick);
             // 
             // LabelInfo
             // 
